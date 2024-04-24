@@ -1,0 +1,153 @@
+---
+title: "NYPD_Shooting_Incidents"
+author: ""
+date: "2023-07-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## NYPD Shooting Incidents
+
+This projects examines NYPD Shooting Incidents using historical data. Data is sourced from <https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic>
+
+This report will attempt to examine multiple areas of this data to see how it relates to shootings, including physical location, race, and time.
+
+First we will import the data and explore the dataset.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+
+
+shooting <- read_csv(url_in)
+
+summary(shooting)
+```
+
+The OCCUR_DATE column appears to be a string value, so we can transform it into a date.
+
+```{r}
+shooting <- shooting %>%
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE))
+```
+
+There are also a large number of columns that we will not be using for our analysis. These can be removed from the dataset.
+
+```{r}
+  
+shooting <- shooting %>% 
+  select(-OCCUR_TIME, -LOC_OF_OCCUR_DESC, -JURISDICTION_CODE, 
+  -LOC_CLASSFCTN_DESC, -LOCATION_DESC, -X_COORD_CD,
+  -Y_COORD_CD, -Latitude, -Longitude, -Lon_Lat)
+  
+head(shooting)
+  
+```
+
+### Shootings By Borough
+
+One area that we can examine is the shootings by Borough.
+
+```{r}
+
+boro_bar <- ggplot(shooting, aes(x=BORO)) +
+  geom_bar(aes(fill = BORO)) +
+  labs(title = 'New York Shooting Incidents by Borough', x = 'Borough', y = 'Shootings')
+  
+boro_bar
+
+```
+
+This shows that Brooklyn has had the most total shootings out of the New York Boroughs, followed by the Bronx. Brooklyn's large number of shootinga may be related to the fact that it has the largest population of New York's boroughs.
+
+### Shootings By Race
+
+Another area that we could examine is a breakdown of shootings by race. Before we begin we need to clean up some of the race data to remove null values.
+
+```{r}
+unique(shooting[c('PERP_RACE')])
+```
+
+The data contains races listed as '(null)' and NA. Since there is also an 'UNKNOWN' category, we should combine all other null-type values to simply be categorized as unknown.
+
+```{r}
+
+shooting$PERP_RACE[shooting$PERP_RACE == '(null)'] <- 'UNKNOWN'
+shooting$PERP_RACE[is.na(shooting$PERP_RACE)] <- 'UNKNOWN'
+
+unique(shooting[c('PERP_RACE')])
+```
+
+Now we can visualize the shooting incidents by the race of the perpetrator.
+
+```{r}
+race_bar <- ggplot(shooting, aes(x=PERP_RACE)) +
+  geom_bar(aes(fill = PERP_RACE)) +
+  labs(title = 'New York Shooting Incidents by Race of Perp', x = 'Race of Perpitrator', y = 'Number of Shooting Incidents') +
+  coord_flip()
+  
+race_bar
+```
+
+This shows that the race of the perpetrator is not known in a large number of the incidents.For incidents in which their is race data, black perpetrators were the most frequent. To get a better understanding of how race relates to the shooting incidents, more accurate data would be beneficial. It would also be beneficial to better understand the demographics of New York's overall population to provide context for the racial breakdown of shooting incidents.
+
+### Shootings Over Time
+
+We can also examine the shooting incidents over time. Since the shootings are given by specific dates, we can instead view them by year by adding a year value to our dataframe. We can then group the number of shootings by year.
+
+```{r}
+
+shooting$Year <- format(shooting$OCCUR_DATE, format="%Y")
+unique(shooting$Year)
+
+shootings_by_year <-shooting %>%
+  group_by(Year) %>%
+  summarise(total_shootings = n()) %>%
+  arrange(Year)
+  
+head(shootings_by_year)
+
+```
+
+```{r}
+
+shootings_year_line <- ggplot(shootings_by_year, aes(x = Year, y = total_shootings, group = 1)) +
+  geom_line() +
+  labs(totle = "New York Shooting Incidents by Year", x = 'Year', y = 'Total Shooting Incidents')
+
+shootings_year_line
+```
+
+
+Interestingly, the graph shows a downward trend of shooting incidents from 2006 - 2019. In 2019 there is a large spike back up to around 2011 levels. One possible explanation for this spike is that it coincides with a difficult time in history with covid as well as political unrest and an election in 2020. Further examination of this time period would be beneficial for understanding this spike.
+
+
+We can additionally return to our previous investigation of shootings by boroughs, now broken down over time. We can now look at the shootings by year for each borough to see how they compare to the total shootings in New York over time.
+```{r}
+
+
+shootings_by_year_boro <-shooting %>%
+    group_by(Year, BORO) %>%
+    summarise(total_shootings = n()) %>%
+    arrange(Year)
+    
+shootings_year_boros <- ggplot(shootings_by_year_boro, aes(x = Year, y = total_shootings, group = BORO)) +
+  geom_line(aes(color = BORO)) +
+  labs(totle = "New York Shooting Incidents by Year", x = 'Year', y = 'Total Shooting Incidents')
+
+shootings_year_boros
+```
+
+
+This shows that the shootings across the boroughs follow a similar pattern to that of New York as a whole, with no significant outliers. This may indicate that the spike around 2019 was due to a wide reaching phenomenon, rather than a localized issue in only one of the boroughs. Interestingly during the spike in shootings around 2019 Bronx briefly surpasses Brooklyn and Manhattan briefly surpasses Queens.
+
+### Conclusion
+
+This report demonstrates a broad overview of historical shooting incident data in New York city. The report examined the shooting data by location, race, and as a trend over time. With this initial analysis, some hypothesis can be made such as borough population relating to number of shootings. Additionally, there may be evidence that covid lockdowns and a tense political climate in 2019-2020 led to an increase in shooting incidents. More data and analysis would be needed to come to strong conclusions around these issues - such as demographic and economic analysis of each borough that may impact shooting rates, or additional data around the year 2019 that might explain the spike in shooting incidents. Additionally, more information would be needed for an analysis regarding race as much of the data was unkown.
+
